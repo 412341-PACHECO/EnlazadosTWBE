@@ -69,6 +69,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	@Override
 	protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
 		String path = request.getRequestURI();
+
+		if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+			return true;
+		}
 		
 		// Saltarse para CUALQUIER ruta de swagger, webjars, v3
 		if (path.contains("swagger") || path.contains("webjars") || path.contains("/v3/")) {

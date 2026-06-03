@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.config.Customizer;
 
 /**
  * Configuración de Spring Security con JWT.
@@ -55,9 +56,11 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
 		http
+			.cors(Customizer.withDefaults())
 			.csrf(csrf -> csrf.disable())
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(authz -> authz
+				.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 				// ===== SWAGGER - TODO DEBE SER PUBLICO =====
 				.requestMatchers("/swagger-ui.html").permitAll()
 				.requestMatchers("/swagger-ui/**").permitAll()
