@@ -14,233 +14,132 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * Manejador global de excepciones para autenticación e inicio de sesión.
- * Intercepta las excepciones lanzadas en los controladores y servicios de autenticación
- * y devuelve respuestas de error estructuradas.
- */
 @RestControllerAdvice
 public class AuthenticationExceptionHandler {
 
 	private static final Logger logger = LoggerFactory.getLogger(AuthenticationExceptionHandler.class);
 
-	/**
-	 * Maneja InvalidCredentialsException (credenciales inválidas).
-	 */
 	@ExceptionHandler(InvalidCredentialsException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidCredentials(
 		InvalidCredentialsException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Intento de login con credenciales inválidas desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			ex.getMessage(),
-			"INVALID_CREDENTIALS",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, ex.getMessage(), "INVALID_CREDENTIALS", request);
 	}
 
-	/**
-	 * Maneja InvalidTokenException (token JWT inválido o malformado).
-	 */
 	@ExceptionHandler(InvalidTokenException.class)
 	public ResponseEntity<ErrorResponse> handleInvalidToken(
 		InvalidTokenException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Token inválido o malformado detectado desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			ex.getMessage(),
-			"INVALID_TOKEN",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, ex.getMessage(), "INVALID_TOKEN", request);
 	}
 
-	/**
-	 * Maneja TokenExpiredException (token JWT expirado).
-	 */
 	@ExceptionHandler(TokenExpiredException.class)
 	public ResponseEntity<ErrorResponse> handleTokenExpired(
 		TokenExpiredException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Intento de acceso con token expirado desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			ex.getMessage(),
-			"TOKEN_EXPIRED",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, ex.getMessage(), "TOKEN_EXPIRED", request);
 	}
 
-	/**
-	 * Maneja AuthenticationException general.
-	 */
+	@ExceptionHandler(EmailNotVerifiedException.class)
+	public ResponseEntity<ErrorResponse> handleEmailNotVerified(
+		EmailNotVerifiedException ex,
+		HttpServletRequest request
+	) {
+		return response(HttpStatus.FORBIDDEN, ex.getMessage(), "EMAIL_NOT_VERIFIED", request);
+	}
+
+	@ExceptionHandler(EmailDeliveryException.class)
+	public ResponseEntity<ErrorResponse> handleEmailDelivery(
+		EmailDeliveryException ex,
+		HttpServletRequest request
+	) {
+		logger.error("Fallo el envio de email", ex);
+		return response(HttpStatus.BAD_GATEWAY, ex.getMessage(), "EMAIL_DELIVERY_ERROR", request);
+	}
+
 	@ExceptionHandler(AuthenticationException.class)
 	public ResponseEntity<ErrorResponse> handleAuthenticationException(
 		AuthenticationException ex,
 		HttpServletRequest request
 	) {
-		logger.error("Error de autenticación desde: {}", request.getRemoteAddr(), ex);
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			ex.getMessage(),
-			"AUTHENTICATION_ERROR",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, ex.getMessage(), "AUTHENTICATION_ERROR", request);
 	}
 
-	/**
-	 * Maneja ExpiredJwtException (token JWT expirado por JwtException).
-	 */
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<ErrorResponse> handleIllegalArgument(
+		IllegalArgumentException ex,
+		HttpServletRequest request
+	) {
+		return response(HttpStatus.BAD_REQUEST, ex.getMessage(), "BAD_REQUEST", request);
+	}
+
 	@ExceptionHandler(ExpiredJwtException.class)
 	public ResponseEntity<ErrorResponse> handleExpiredJwtException(
 		ExpiredJwtException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Token JWT expirado desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"El token de autenticación ha expirado",
-			"TOKEN_EXPIRED",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "El token de autenticacion ha expirado", "TOKEN_EXPIRED", request);
 	}
 
-	/**
-	 * Maneja MalformedJwtException (token JWT malformado).
-	 */
 	@ExceptionHandler(MalformedJwtException.class)
 	public ResponseEntity<ErrorResponse> handleMalformedJwtException(
 		MalformedJwtException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Token JWT malformado desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"El token proporcionado tiene un formato inválido",
-			"MALFORMED_TOKEN",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "El token proporcionado tiene un formato invalido", "MALFORMED_TOKEN", request);
 	}
 
-	/**
-	 * Maneja SignatureException (firma del token inválida).
-	 */
 	@ExceptionHandler(SignatureException.class)
 	public ResponseEntity<ErrorResponse> handleSignatureException(
 		SignatureException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Firma de token JWT inválida desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"La firma del token es inválida",
-			"INVALID_SIGNATURE",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "La firma del token es invalida", "INVALID_SIGNATURE", request);
 	}
 
-	/**
-	 * Maneja JwtException general (otras excepciones de JWT).
-	 */
 	@ExceptionHandler(JwtException.class)
 	public ResponseEntity<ErrorResponse> handleJwtException(
 		JwtException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Error en token JWT desde: {}", request.getRemoteAddr(), ex);
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"Error al procesar el token de autenticación",
-			"JWT_ERROR",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "Error al procesar el token de autenticacion", "JWT_ERROR", request);
 	}
 
-	/**
-	 * Maneja BadCredentialsException (credenciales inválidas de Spring Security).
-	 */
 	@ExceptionHandler(BadCredentialsException.class)
 	public ResponseEntity<ErrorResponse> handleBadCredentials(
 		BadCredentialsException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Credenciales inválidas desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"Email o contraseña incorrectos",
-			"BAD_CREDENTIALS",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "Email o contrasena incorrectos", "BAD_CREDENTIALS", request);
 	}
 
-	/**
-	 * Maneja UsernameNotFoundException (usuario no encontrado por Spring Security).
-	 */
 	@ExceptionHandler(UsernameNotFoundException.class)
 	public ResponseEntity<ErrorResponse> handleUsernameNotFound(
 		UsernameNotFoundException ex,
 		HttpServletRequest request
 	) {
-		logger.warn("Usuario no encontrado desde: {}", request.getRemoteAddr());
-
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.UNAUTHORIZED.value(),
-			"Email o contraseña incorrectos",
-			"USER_NOT_FOUND",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.UNAUTHORIZED);
+		return response(HttpStatus.UNAUTHORIZED, "Email o contrasena incorrectos", "USER_NOT_FOUND", request);
 	}
 
-	/**
-	 * Manejador genérico para cualquier excepción no capturada.
-	 */
 	@ExceptionHandler(Exception.class)
 	public ResponseEntity<ErrorResponse> handleGenericException(
 		Exception ex,
 		HttpServletRequest request
 	) {
-		logger.error("Error inesperado desde: {}", request.getRemoteAddr(), ex);
+		logger.error("Error inesperado", ex);
+		return response(HttpStatus.INTERNAL_SERVER_ERROR, "Error interno del servidor", "INTERNAL_SERVER_ERROR", request);
+	}
 
-		ErrorResponse error = ErrorResponse.of(
-			HttpStatus.INTERNAL_SERVER_ERROR.value(),
-			"Error interno del servidor",
-			"INTERNAL_SERVER_ERROR",
-			request.getRequestURI()
-		);
-
-		return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+	private ResponseEntity<ErrorResponse> response(
+		HttpStatus status,
+		String message,
+		String error,
+		HttpServletRequest request
+	) {
+		ErrorResponse body = ErrorResponse.of(status.value(), message, error, request.getRequestURI());
+		return new ResponseEntity<>(body, status);
 	}
 }

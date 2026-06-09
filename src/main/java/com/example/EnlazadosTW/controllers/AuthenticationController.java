@@ -1,20 +1,22 @@
 package com.example.EnlazadosTW.controllers;
 
 import com.example.EnlazadosTW.dtos.AuthResponseDto;
+import com.example.EnlazadosTW.dtos.ForgotPasswordRequestDto;
 import com.example.EnlazadosTW.dtos.LoginRequestDto;
+import com.example.EnlazadosTW.dtos.MessageResponseDto;
 import com.example.EnlazadosTW.dtos.RefreshTokenRequestDto;
+import com.example.EnlazadosTW.dtos.ResendVerificationEmailRequestDto;
+import com.example.EnlazadosTW.dtos.ResetPasswordRequestDto;
 import com.example.EnlazadosTW.services.AuthenticationService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Controlador REST para autenticación de usuarios.
- * Maneja endpoints de login y refresco de tokens.
- *
- * Las excepciones lanzadas por este controlador son interceptadas por
- * AuthenticationExceptionHandler que las convierte en respuestas JSON estructuradas.
- */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthenticationController {
@@ -25,49 +27,46 @@ public class AuthenticationController {
 		this.authenticationService = authenticationService;
 	}
 
-	/**
-	 * Endpoint de login.
-	 * Valida credenciales y retorna un JWT access token y refresh token.
-	 *
-	 * @param loginRequest solicitud con email y contraseña
-	 * @return respuesta con tokens JWT
-	 *
-	 * Excepciones posibles:
-	 * - InvalidCredentialsException (401): Credenciales inválidas
-	 * - UserNotFoundException (401): Usuario no encontrado
-	 * - UserInactiveException (403): Usuario inactivo
-	 */
 	@PostMapping("/login")
 	public ResponseEntity<AuthResponseDto> login(@Valid @RequestBody LoginRequestDto loginRequest) {
-		AuthResponseDto response = authenticationService.authenticate(loginRequest);
-		return ResponseEntity.ok(response);
+		return ResponseEntity.ok(authenticationService.authenticate(loginRequest));
 	}
 
-	/**
-	 * Endpoint para refrescar el access token.
-	 * Utiliza un refresh token válido para obtener un nuevo access token.
-	 *
-	 * @param refreshRequest solicitud con el refresh token
-	 * @return respuesta con nuevo access token
-	 *
-	 * Excepciones posibles:
-	 * - TokenExpiredException (401): Refresh token ha expirado
-	 * - InvalidTokenException (401): Refresh token es inválido o malformado
-	 */
 	@PostMapping("/refresh")
 	public ResponseEntity<AuthResponseDto> refreshToken(
 		@Valid @RequestBody RefreshTokenRequestDto refreshRequest
 	) {
-		AuthResponseDto response = authenticationService.refreshAccessToken(refreshRequest.refreshToken());
-		return ResponseEntity.ok(response);
+		return ResponseEntity.ok(authenticationService.refreshAccessToken(refreshRequest.refreshToken()));
 	}
 
-	/**
-	 * Endpoint de health check para autenticación.
-	 * Valida que el token del usuario actual sea válido.
-	 */
+	@GetMapping("/verify-email")
+	public ResponseEntity<MessageResponseDto> verifyEmail(@RequestParam String token) {
+		return ResponseEntity.ok(authenticationService.verifyEmail(token));
+	}
+
+	@PostMapping("/resend-verification")
+	public ResponseEntity<MessageResponseDto> resendVerificationEmail(
+		@Valid @RequestBody ResendVerificationEmailRequestDto request
+	) {
+		return ResponseEntity.ok(authenticationService.resendVerificationEmail(request));
+	}
+
+	@PostMapping("/forgot-password")
+	public ResponseEntity<MessageResponseDto> forgotPassword(
+		@Valid @RequestBody ForgotPasswordRequestDto request
+	) {
+		return ResponseEntity.ok(authenticationService.requestPasswordReset(request));
+	}
+
+	@PostMapping("/reset-password")
+	public ResponseEntity<MessageResponseDto> resetPassword(
+		@Valid @RequestBody ResetPasswordRequestDto request
+	) {
+		return ResponseEntity.ok(authenticationService.resetPassword(request));
+	}
+
 	@GetMapping("/me")
 	public ResponseEntity<String> getCurrentUser() {
-		return ResponseEntity.ok("Autenticación válida");
+		return ResponseEntity.ok("Autenticacion valida");
 	}
 }

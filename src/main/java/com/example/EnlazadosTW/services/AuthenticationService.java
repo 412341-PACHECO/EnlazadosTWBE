@@ -1,92 +1,77 @@
 package com.example.EnlazadosTW.services;
 
 import com.example.EnlazadosTW.dtos.AuthResponseDto;
+import com.example.EnlazadosTW.dtos.ForgotPasswordRequestDto;
 import com.example.EnlazadosTW.dtos.LoginRequestDto;
-import com.example.EnlazadosTW.exceptions.InvalidCredentialsException;
+import com.example.EnlazadosTW.dtos.MessageResponseDto;
+import com.example.EnlazadosTW.dtos.ResendVerificationEmailRequestDto;
+import com.example.EnlazadosTW.dtos.ResetPasswordRequestDto;
+import com.example.EnlazadosTW.entities.EmailVerificationToken;
+import com.example.EnlazadosTW.entities.PasswordResetToken;
 import com.example.EnlazadosTW.entities.User;
+import com.example.EnlazadosTW.exceptions.InvalidCredentialsException;
 import com.example.EnlazadosTW.repositories.UserRepository;
+import java.time.LocalDateTime;
 import com.example.EnlazadosTW.security.JwtTokenProvider;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Servicio de autenticación que maneja el login de usuarios.
- * Valida credenciales y genera tokens JWT.
- */
 @Service
+@Transactional
 public class AuthenticationService {
 
 	private final UserRepository userRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final JwtTokenProvider jwtTokenProvider;
 	private final CustomUserDetailsService userDetailsService;
+	private final EmailVerificationTokenService emailVerificationTokenService;
+	private final PasswordResetTokenService passwordResetTokenService;
+	private final EmailService emailService;
 
-	public AuthenticationService(UserRepository userRepository,
-								 PasswordEncoder passwordEncoder,
-								 JwtTokenProvider jwtTokenProvider,
-								 CustomUserDetailsService userDetailsService) {
+	public AuthenticationService(
+		UserRepository userRepository,
+		PasswordEncoder passwordEncoder,
+		JwtTokenProvider jwtTokenProvider,
+		CustomUserDetailsService userDetailsService,
+		EmailVerificationTokenService emailVerificationTokenService,
+		PasswordResetTokenService passwordResetTokenService,
+		EmailService emailService
+	) {
 		this.userRepository = userRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.jwtTokenProvider = jwtTokenProvider;
 		this.userDetailsService = userDetailsService;
+		this.emailVerificationTokenService = emailVerificationTokenService;
+		this.passwordResetTokenService = passwordResetTokenService;
+		this.emailService = emailService;
 	}
 
-	/**
-	 * Autentica un usuario validando sus credenciales y generando un token JWT.
-	 *
-	 * @param loginRequest solicitud con email y contraseña
-	 * @return respuesta con token JWT y refresh token
-	 * @throws InvalidCredentialsException si las credenciales son inválidas
-	 * @throws UserNotFoundException si el usuario no existe (lanzado por CustomUserDetailsService)
-	 * @throws UserInactiveException si el usuario está inactivo (lanzado por CustomUserDetailsService)
-	 */
 	public AuthResponseDto authenticate(LoginRequestDto loginRequest) {
-		// Buscar usuario por email y validar contraseña
 		User user = userRepository.findByEmail(loginRequest.email())
-			.orElseThrow(() -> new InvalidCredentialsException(
-				"Email o contraseña incorrectos"
-			));
+			.orElseThrow(() -> new InvalidCredentialsException("Email o contrasena incorrectos"));
 
-		// Validar contraseña
 		if (!passwordEncoder.matches(loginRequest.password(), user.getPassword())) {
-			throw new InvalidCredentialsException(
-				"Email o contraseña incorrectos"
-			);
+			throw new InvalidCredentialsException("Email o contrasena incorrectos");
 		}
 
-		// Cargar UserDetails (esto lanzará UserInactiveException si el usuario está inactivo)
 		UserDetails userDetails = userDetailsService.loadUserByUsername(loginRequest.email());
-
-		// Generar tokens
 		String accessToken = jwtTokenProvider.generateToken(userDetails);
 		String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
 
 		return new AuthResponseDto(
 			accessToken,
 			refreshToken,
-			3600L, // 1 hora en segundos
+			3600L,
 			user.getEmail(),
 			user.getRole().getName()
 		);
 	}
 
-	/**
-	 * Refresca el access token usando un refresh token válido.
-	 *
-	 * @param refreshToken el refresh token proporcionado por el cliente
-	 * @return respuesta con nuevo access token
-	 * @throws TokenExpiredException si el refresh token ha expirado
-	 * @throws InvalidTokenException si el refresh token es inválido
-	 */
 	public AuthResponseDto refreshAccessToken(String refreshToken) {
-		// Validar el refresh token (lanza excepciones si no es válido)
 		jwtTokenProvider.validateToken(refreshToken);
-
-		// Extraer email del refresh token
 		String email = jwtTokenProvider.getEmailFromToken(refreshToken);
-
-		// Cargar usuario y generar nuevo access token
 		UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 		String accessToken = jwtTokenProvider.generateToken(userDetails);
 
@@ -99,5 +84,55 @@ public class AuthenticationService {
 			user.getEmail(),
 			user.getRole().getName()
 		);
+	}
+
+	public MessageResponseDto verifyEmail(String token) {
+		EmailVerificationToken verificationToken = emailVerificationTokenService.validateToken(token);
+		User user = verificationToken.getUser();
+
+		user.setEnabled(true);
+		user.setEmailVerifiedAt(LocalDateTime.now());
+		userRepository.save(user);
+		emailVerificationTokenService.markAsUsed(verificationToken);
+
+		return new MessageResponseDto("Cuenta verificada correctamente");
+	}
+
+	public MessageResponseDto resendVerificationEmail(ResendVerificationEmailRequestDto request) {
+		User user = userRepository.findByEmail(request.email())
+			.orElseThrow(() -> new InvalidCredentialsException("No existe una cuenta asociada al email indicado"));
+
+		if (Boolean.TRUE.equals(user.getEnabled())) {
+			return new MessageResponseDto("La cuenta ya se encuentra verificada");
+		}
+
+		EmailVerificationToken verificationToken = emailVerificationTokenService.createForUser(user);
+		emailService.sendVerificationEmail(user, verificationToken.getToken());
+
+		return new MessageResponseDto("Se envio un nuevo correo de verificacion");
+	}
+
+	public MessageResponseDto requestPasswordReset(ForgotPasswordRequestDto request) {
+		userRepository.findByEmail(request.email()).ifPresent(user -> {
+			if (Boolean.TRUE.equals(user.getEnabled()) && Boolean.TRUE.equals(user.getIsActive())) {
+				PasswordResetToken resetToken = passwordResetTokenService.createForUser(user);
+				emailService.sendPasswordResetEmail(user, resetToken.getToken());
+			}
+		});
+
+		return new MessageResponseDto("Si el email existe, recibira instrucciones para cambiar la contrasena");
+	}
+
+	public MessageResponseDto resetPassword(ResetPasswordRequestDto request) {
+		PasswordResetToken resetToken = passwordResetTokenService.validateToken(request.token());
+		User user = resetToken.getUser();
+
+		user.setPassword(passwordEncoder.encode(request.newPassword()));
+		userRepository.save(user);
+
+		passwordResetTokenService.markAsUsed(resetToken);
+		passwordResetTokenService.invalidateActiveTokens(user.getId());
+
+		return new MessageResponseDto("La contrasena fue actualizada correctamente");
 	}
 }

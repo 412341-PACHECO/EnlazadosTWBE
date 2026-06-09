@@ -15,6 +15,7 @@ public record UserResponseDto(
 	String lastName,
 	String fcmToken,
 	Boolean isActive,
+	Boolean enabled,
 	RoleBasicDto role,
 	LocalDateTime createdAt,
 	LocalDateTime updatedAt

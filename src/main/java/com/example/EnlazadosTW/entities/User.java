@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -61,6 +62,13 @@ public class User extends BaseEntity {
 	@Builder.Default
 	@Column(nullable = false)
 	private Boolean isActive = true;
+
+	@Builder.Default
+	@Column(nullable = false)
+	private Boolean enabled = false;
+
+	@Column(name = "email_verified_at")
+	private LocalDateTime emailVerifiedAt;
 
 	@OneToOne(mappedBy = "user")
 	private ProfessionalProfile professionalProfile;

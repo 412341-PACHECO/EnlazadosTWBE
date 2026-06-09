@@ -1,6 +1,7 @@
 package com.example.EnlazadosTW.services;
 
 import com.example.EnlazadosTW.entities.User;
+import com.example.EnlazadosTW.exceptions.EmailNotVerifiedException;
 import com.example.EnlazadosTW.exceptions.UserInactiveException;
 import com.example.EnlazadosTW.exceptions.UserNotFoundException;
 import com.example.EnlazadosTW.repositories.UserRepository;
@@ -40,6 +41,10 @@ public class CustomUserDetailsService implements UserDetailsService {
 		// Verificar que el usuario está activo
 		if (!user.getIsActive()) {
 			throw new UserInactiveException("El usuario está inactivo: " + email + ". Contacte con administración");
+		}
+
+		if (!user.getEnabled()) {
+			throw new EmailNotVerifiedException("La cuenta aun no confirmo el email: " + email);
 		}
 
 		// Construir UserDetails con rol como autoridad
