@@ -64,6 +64,12 @@ public class ProfessionalProfileController {
 		return ResponseEntity.ok(profile);
 	}
 
+	@GetMapping("/search/by-user-email")
+	public ResponseEntity<ProfessionalProfileResponseDto> getProfileByUserEmail(@RequestParam String email) {
+		ProfessionalProfileResponseDto profile = profileService.getProfileByUserEmail(email);
+		return ResponseEntity.ok(profile);
+	}
+
 	/**
 	 * Obtiene todos los perfiles profesionales.
 	 *

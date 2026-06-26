@@ -1,12 +1,16 @@
 package com.example.EnlazadosTW.services;
 
+import com.example.EnlazadosTW.dtos.ParentProfileResponseDto;
+import com.example.EnlazadosTW.dtos.PatientBasicDto;
 import com.example.EnlazadosTW.dtos.RoleBasicDto;
 import com.example.EnlazadosTW.dtos.UserCreateDto;
 import com.example.EnlazadosTW.dtos.UserResponseDto;
 import com.example.EnlazadosTW.dtos.UserUpdateDto;
 import com.example.EnlazadosTW.entities.EmailVerificationToken;
+import com.example.EnlazadosTW.entities.Patient;
 import com.example.EnlazadosTW.entities.Role;
 import com.example.EnlazadosTW.entities.User;
+import com.example.EnlazadosTW.repositories.PatientRepository;
 import com.example.EnlazadosTW.repositories.RoleRepository;
 import com.example.EnlazadosTW.repositories.UserRepository;
 import java.util.List;
@@ -22,6 +26,7 @@ public class UserService {
 
 	private final UserRepository userRepository;
 	private final RoleRepository roleRepository;
+	private final PatientRepository patientRepository;
 	private final PasswordEncoder passwordEncoder;
 	private final EmailVerificationTokenService emailVerificationTokenService;
 	private final EmailService emailService;
@@ -29,12 +34,14 @@ public class UserService {
 	public UserService(
 		UserRepository userRepository,
 		RoleRepository roleRepository,
+		PatientRepository patientRepository,
 		PasswordEncoder passwordEncoder,
 		EmailVerificationTokenService emailVerificationTokenService,
 		EmailService emailService
 	) {
 		this.userRepository = userRepository;
 		this.roleRepository = roleRepository;
+		this.patientRepository = patientRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.emailVerificationTokenService = emailVerificationTokenService;
 		this.emailService = emailService;
@@ -79,6 +86,24 @@ public class UserService {
 			.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con email: " + email));
 
 		return mapToResponseDto(user);
+	}
+
+	@Transactional(readOnly = true)
+	public ParentProfileResponseDto getParentProfileById(UUID id) {
+		User user = userRepository.findById(id)
+			.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con ID: " + id));
+
+		validateParentRole(user);
+		return mapToParentProfileResponseDto(user);
+	}
+
+	@Transactional(readOnly = true)
+	public ParentProfileResponseDto getParentProfileByEmail(String email) {
+		User user = userRepository.findByEmail(email)
+			.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con email: " + email));
+
+		validateParentRole(user);
+		return mapToParentProfileResponseDto(user);
 	}
 
 	@Transactional(readOnly = true)
@@ -167,5 +192,46 @@ public class UserService {
 			user.getCreatedAt(),
 			user.getUpdatedAt()
 		);
+	}
+
+	private ParentProfileResponseDto mapToParentProfileResponseDto(User user) {
+		List<PatientBasicDto> patients = patientRepository.findByParentId(user.getId())
+			.stream()
+			.map(this::mapToPatientBasicDto)
+			.collect(Collectors.toList());
+
+		return new ParentProfileResponseDto(
+			user.getId(),
+			user.getEmail(),
+			user.getFirstName(),
+			user.getLastName(),
+			user.getIsActive(),
+			user.getEnabled(),
+			new RoleBasicDto(user.getRole().getId(), user.getRole().getName()),
+			patients,
+			user.getCreatedAt(),
+			user.getUpdatedAt()
+		);
+	}
+
+	private PatientBasicDto mapToPatientBasicDto(Patient patient) {
+		return new PatientBasicDto(
+			patient.getId(),
+			patient.getFirstName(),
+			patient.getLastName(),
+			patient.getDiagnosis()
+		);
+	}
+
+	private void validateParentRole(User user) {
+		String roleName = normalizeRoleName(user.getRole().getName());
+		if (!"PARENT".equalsIgnoreCase(roleName)) {
+			throw new IllegalArgumentException("El usuario no tiene rol PARENT");
+		}
+	}
+
+	private String normalizeRoleName(String roleName) {
+		String upper = roleName.toUpperCase();
+		return upper.startsWith("ROLE_") ? upper.substring(5) : upper;
 	}
 }

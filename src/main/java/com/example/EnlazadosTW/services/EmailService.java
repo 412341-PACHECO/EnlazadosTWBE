@@ -1,5 +1,6 @@
 package com.example.EnlazadosTW.services;
 
+import com.example.EnlazadosTW.entities.TherapeuticTeamInvitation;
 import com.example.EnlazadosTW.entities.User;
 import com.example.EnlazadosTW.exceptions.EmailDeliveryException;
 import jakarta.mail.MessagingException;
@@ -21,17 +22,20 @@ public class EmailService {
 	private final String fromEmail;
 	private final String verifyEmailUrl;
 	private final String resetPasswordUrl;
+	private final String therapeuticTeamInvitationUrl;
 
 	public EmailService(
 		JavaMailSender mailSender,
 		@Value("${app.email.from}") String fromEmail,
 		@Value("${app.frontend.verify-email-url}") String verifyEmailUrl,
-		@Value("${app.frontend.reset-password-url}") String resetPasswordUrl
+		@Value("${app.frontend.reset-password-url}") String resetPasswordUrl,
+		@Value("${app.frontend.therapeutic-team-invitation-url:http://localhost:8100/therapeutic-team-invitations/accept}") String therapeuticTeamInvitationUrl
 	) {
 		this.mailSender = mailSender;
 		this.fromEmail = fromEmail;
 		this.verifyEmailUrl = verifyEmailUrl;
 		this.resetPasswordUrl = resetPasswordUrl;
+		this.therapeuticTeamInvitationUrl = therapeuticTeamInvitationUrl;
 	}
 
 	public void sendVerificationEmail(User user, String token) {
@@ -60,6 +64,30 @@ public class EmailService {
 			""".formatted(user.getFirstName(), resetLink);
 
 		sendHtmlEmail(user.getEmail(), subject, html);
+	}
+
+	public void sendTherapeuticTeamInvitationEmail(TherapeuticTeamInvitation invitation) {
+		String invitationLink = therapeuticTeamInvitationUrl + "?token=" + invitation.getToken();
+		String patientFullName = invitation.getPatient().getFirstName() + " " + invitation.getPatient().getLastName();
+		String invitedByFullName = invitation.getInvitedByUser().getFirstName() + " " + invitation.getInvitedByUser().getLastName();
+
+		String subject = "Invitacion a equipo terapeutico en EnlazadosTW";
+		String html = """
+			<h2>Invitacion a equipo terapeutico</h2>
+			<p>Has sido invitado a integrar el equipo terapeutico del paciente %s.</p>
+			<p>Invitacion realizada por: %s.</p>
+			<p>Fecha de inicio propuesta: %s.</p>
+			<p><a href="%s">Revisar invitacion</a></p>
+			<p>Si aun no tienes cuenta, puedes registrarte y luego volver a utilizar este mismo enlace.</p>
+			<p>Si no reconoces esta invitacion, ignora este mensaje.</p>
+			""".formatted(
+				patientFullName,
+				invitedByFullName,
+				invitation.getStartDate(),
+				invitationLink
+			);
+
+		sendHtmlEmail(invitation.getInvitedEmail(), subject, html);
 	}
 
 	private void sendHtmlEmail(String to, String subject, String html) {

@@ -99,6 +99,23 @@ public class ProfessionalProfileService {
 	}
 
 	/**
+	 * Obtiene el perfil profesional a partir del email del usuario.
+	 *
+	 * @param email email del usuario profesional
+	 * @return perfil profesional encontrado
+	 */
+	@Transactional(readOnly = true)
+	public ProfessionalProfileResponseDto getProfileByUserEmail(String email) {
+		User user = userRepository.findByEmail(email)
+			.orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado con email: " + email));
+
+		ProfessionalProfile profile = profileRepository.findByUserId(user.getId())
+			.orElseThrow(() -> new IllegalArgumentException("El usuario no tiene un perfil profesional"));
+
+		return mapToResponseDto(profile);
+	}
+
+	/**
 	 * Obtiene todos los perfiles profesionales.
 	 *
 	 * @return lista de todos los perfiles

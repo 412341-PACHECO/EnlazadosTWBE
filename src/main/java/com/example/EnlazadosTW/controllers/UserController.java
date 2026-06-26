@@ -1,5 +1,6 @@
 package com.example.EnlazadosTW.controllers;
 
+import com.example.EnlazadosTW.dtos.ParentProfileResponseDto;
 import com.example.EnlazadosTW.dtos.UserCreateDto;
 import com.example.EnlazadosTW.dtos.UserResponseDto;
 import com.example.EnlazadosTW.dtos.UserUpdateDto;
@@ -60,6 +61,18 @@ public class UserController {
 	public ResponseEntity<UserResponseDto> getUserByEmail(@RequestParam String email) {
 		UserResponseDto user = userService.getUserByEmail(email);
 		return ResponseEntity.ok(user);
+	}
+
+	@GetMapping("/parents/{id}")
+	public ResponseEntity<ParentProfileResponseDto> getParentProfileById(@PathVariable UUID id) {
+		ParentProfileResponseDto parent = userService.getParentProfileById(id);
+		return ResponseEntity.ok(parent);
+	}
+
+	@GetMapping("/parents/search/by-email")
+	public ResponseEntity<ParentProfileResponseDto> getParentProfileByEmail(@RequestParam String email) {
+		ParentProfileResponseDto parent = userService.getParentProfileByEmail(email);
+		return ResponseEntity.ok(parent);
 	}
 
 	/**
