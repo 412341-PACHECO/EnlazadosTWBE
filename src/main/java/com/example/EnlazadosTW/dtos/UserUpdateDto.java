@@ -20,5 +20,7 @@ public record UserUpdateDto(
 	@Size(min = 2, max = 100, message = "El apellido debe tener entre 2 y 100 caracteres")
 	String lastName,
 
+	String fcmToken,
+
 	Boolean isActive
 ) {}

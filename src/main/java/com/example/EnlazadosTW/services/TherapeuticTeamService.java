@@ -284,6 +284,7 @@ public class TherapeuticTeamService {
 			professional.getLongitude(),
 			professional.getAcceptedHealthInsurances(),
 			professional.getSessionFee(),
+			professional.getCoverageRadiusKm(),
 			professional.getCreatedAt(),
 			professional.getUpdatedAt()
 		);

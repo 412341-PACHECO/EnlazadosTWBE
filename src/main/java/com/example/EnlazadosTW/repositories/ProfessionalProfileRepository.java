@@ -31,6 +31,8 @@ public interface ProfessionalProfileRepository extends JpaRepository<Professiona
 	 */
 	List<ProfessionalProfile> findBySpecialty(String specialty);
 
+	List<ProfessionalProfile> findBySpecialtyIgnoreCase(String specialty);
+
 	/**
 	 * Busca un perfil profesional por número de matrícula.
 	 * 

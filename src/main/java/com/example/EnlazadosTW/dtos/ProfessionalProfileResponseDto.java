@@ -7,7 +7,6 @@ import java.util.UUID;
 
 /**
  * DTO de respuesta para un perfil profesional.
- * Utilizado en operaciones GET, POST (create) y PUT (update).
  */
 public record ProfessionalProfileResponseDto(
 	UUID id,
@@ -18,6 +17,7 @@ public record ProfessionalProfileResponseDto(
 	BigDecimal longitude,
 	List<String> acceptedHealthInsurances,
 	BigDecimal sessionFee,
+	BigDecimal coverageRadiusKm,
 	LocalDateTime createdAt,
 	LocalDateTime updatedAt
 ) {}

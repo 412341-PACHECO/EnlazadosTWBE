@@ -1,16 +1,17 @@
 package com.example.EnlazadosTW.controllers;
 
 import com.example.EnlazadosTW.dtos.ProfessionalProfileCreateDto;
+import com.example.EnlazadosTW.dtos.ProfessionalProfileMapResponseDto;
 import com.example.EnlazadosTW.dtos.ProfessionalProfileResponseDto;
 import com.example.EnlazadosTW.dtos.ProfessionalProfileUpdateDto;
 import com.example.EnlazadosTW.services.ProfessionalProfileService;
 import jakarta.validation.Valid;
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import java.util.UUID;
 
 /**
  * Controlador REST para gestionar perfiles profesionales.
@@ -107,6 +108,24 @@ public class ProfessionalProfileController {
 	) {
 		ProfessionalProfileResponseDto profile = profileService.getProfileByLicenseNumber(licenseNumber);
 		return ResponseEntity.ok(profile);
+	}
+
+	@GetMapping("/map/nearby")
+	public ResponseEntity<List<ProfessionalProfileMapResponseDto>> getNearbyProfiles(
+		@RequestParam BigDecimal latitude,
+		@RequestParam BigDecimal longitude,
+		@RequestParam BigDecimal radiusKm,
+		@RequestParam(required = false) String specialty,
+		@RequestParam(required = false) String acceptedHealthInsurance
+	) {
+		List<ProfessionalProfileMapResponseDto> profiles = profileService.getNearbyProfiles(
+			latitude,
+			longitude,
+			radiusKm,
+			specialty,
+			acceptedHealthInsurance
+		);
+		return ResponseEntity.ok(profiles);
 	}
 
 	/**

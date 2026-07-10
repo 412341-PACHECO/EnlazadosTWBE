@@ -153,6 +153,10 @@ public class UserService {
 			user.setPassword(passwordEncoder.encode(updateDto.password()));
 		}
 
+		if (updateDto.fcmToken() != null) {
+			user.setFcmToken(updateDto.fcmToken().isBlank() ? null : updateDto.fcmToken().trim());
+		}
+
 		if (updateDto.isActive() != null) {
 			user.setIsActive(updateDto.isActive());
 		}

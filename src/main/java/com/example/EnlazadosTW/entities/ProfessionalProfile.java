@@ -8,6 +8,8 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -16,13 +18,10 @@ import lombok.Setter;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
-import java.math.BigDecimal;
-import java.util.List;
-
 /**
  * Entidad que representa el perfil profesional de un terapeuta o profesional.
- * Contiene información extendida como especialidad, matrícula, ubicación y honorarios.
- * Extiende de BaseEntity para heredar campos de auditoría (createdAt, updatedAt).
+ * Contiene informacion extendida como especialidad, matricula, ubicacion y honorarios.
+ * Extiende de BaseEntity para heredar campos de auditoria.
  */
 @Entity
 @Getter
@@ -43,8 +42,8 @@ public class ProfessionalProfile extends BaseEntity {
 	@Column(nullable = false, length = 100)
 	private String specialty;
 
-	@NotBlank(message = "El número de matrícula es requerido")
-	@Size(min = 5, max = 50, message = "El número de matrícula debe tener entre 5 y 50 caracteres")
+	@NotBlank(message = "El numero de matricula es requerido")
+	@Size(min = 5, max = 50, message = "El numero de matricula debe tener entre 5 y 50 caracteres")
 	@Column(name = "license_number", nullable = false, length = 50, unique = true)
 	private String licenseNumber;
 
@@ -60,8 +59,10 @@ public class ProfessionalProfile extends BaseEntity {
 	@JdbcTypeCode(SqlTypes.JSON)
 	private List<String> acceptedHealthInsurances;
 
-	@NotNull(message = "El honorario de sesión es requerido")
+	@NotNull(message = "El honorario de sesion es requerido")
 	@Column(name = "session_fee", nullable = false, precision = 10, scale = 2)
 	private BigDecimal sessionFee;
 
+	@Column(name = "coverage_radius_km", precision = 10, scale = 2)
+	private BigDecimal coverageRadiusKm;
 }

@@ -6,5 +6,6 @@ package com.example.EnlazadosTW.enums;
 public enum DailyReportPriority {
 	LOW,
 	MEDIUM,
-	HIGH
+	HIGH,
+	CRITICAL
 }

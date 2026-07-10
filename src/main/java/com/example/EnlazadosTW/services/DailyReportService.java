@@ -9,14 +9,20 @@ import com.example.EnlazadosTW.dtos.UserBasicDto;
 import com.example.EnlazadosTW.entities.DailyReport;
 import com.example.EnlazadosTW.entities.Patient;
 import com.example.EnlazadosTW.entities.ProfessionalProfile;
+import com.example.EnlazadosTW.entities.TherapeuticTeam;
 import com.example.EnlazadosTW.entities.User;
+import com.example.EnlazadosTW.enums.DailyReportPriority;
 import com.example.EnlazadosTW.repositories.DailyReportRepository;
 import com.example.EnlazadosTW.repositories.PatientRepository;
 import com.example.EnlazadosTW.repositories.ProfessionalProfileRepository;
+import com.example.EnlazadosTW.repositories.TherapeuticTeamRepository;
 import com.example.EnlazadosTW.repositories.UserRepository;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,20 +37,26 @@ public class DailyReportService {
 	private final PatientRepository patientRepository;
 	private final UserRepository userRepository;
 	private final ProfessionalProfileRepository professionalProfileRepository;
+	private final TherapeuticTeamRepository therapeuticTeamRepository;
 	private final TherapeuticTeamService therapeuticTeamService;
+	private final FcmNotificationService fcmNotificationService;
 
 	public DailyReportService(
 		DailyReportRepository dailyReportRepository,
 		PatientRepository patientRepository,
 		UserRepository userRepository,
 		ProfessionalProfileRepository professionalProfileRepository,
-		TherapeuticTeamService therapeuticTeamService
+		TherapeuticTeamRepository therapeuticTeamRepository,
+		TherapeuticTeamService therapeuticTeamService,
+		FcmNotificationService fcmNotificationService
 	) {
 		this.dailyReportRepository = dailyReportRepository;
 		this.patientRepository = patientRepository;
 		this.userRepository = userRepository;
 		this.professionalProfileRepository = professionalProfileRepository;
+		this.therapeuticTeamRepository = therapeuticTeamRepository;
 		this.therapeuticTeamService = therapeuticTeamService;
+		this.fcmNotificationService = fcmNotificationService;
 	}
 
 	public DailyReportResponseDto createDailyReport(DailyReportCreateDto createDto) {
@@ -61,7 +73,10 @@ public class DailyReportService {
 			.sentimentScore(createDto.sentimentScore())
 			.build();
 
-		return mapToResponseDto(dailyReportRepository.save(dailyReport));
+		DailyReport savedDailyReport = dailyReportRepository.save(dailyReport);
+		dispatchCriticalPushNotificationIfNeeded(savedDailyReport);
+
+		return mapToResponseDto(savedDailyReport);
 	}
 
 	@Transactional(readOnly = true)
@@ -167,6 +182,83 @@ public class DailyReportService {
 		if (!assigned) {
 			throw new IllegalArgumentException("El profesional no integra el equipo terapeutico activo del paciente");
 		}
+	}
+
+	private void dispatchCriticalPushNotificationIfNeeded(DailyReport dailyReport) {
+		if (!shouldNotify(dailyReport.getPriority())) {
+			return;
+		}
+
+		List<String> recipientTokens = resolveNotificationTokens(dailyReport);
+		if (recipientTokens.isEmpty()) {
+			return;
+		}
+
+		String normalizedPriority = translatePriority(dailyReport.getPriority());
+		String patientFullName = buildPatientFullName(dailyReport.getPatient());
+		String title = "Alerta " + normalizedPriority;
+		String body = "Nuevo reporte de " + patientFullName + " con prioridad " + normalizedPriority + ".";
+
+		Map<String, String> data = Map.of(
+			"patientId", dailyReport.getPatient().getId().toString(),
+			"dailyReportId", dailyReport.getId().toString(),
+			"priority", dailyReport.getPriority().name()
+		);
+
+		fcmNotificationService.sendToTokens(recipientTokens, title, body, data);
+	}
+
+	private boolean shouldNotify(DailyReportPriority priority) {
+		return DailyReportPriority.HIGH.equals(priority) || DailyReportPriority.CRITICAL.equals(priority);
+	}
+
+	private List<String> resolveNotificationTokens(DailyReport dailyReport) {
+		List<User> recipients = new ArrayList<>();
+
+		Patient patient = dailyReport.getPatient();
+		if (patient.getParent() != null) {
+			recipients.add(patient.getParent());
+		}
+
+		LocalDate today = LocalDate.now();
+		List<User> teamUsers = therapeuticTeamRepository.findByPatientId(patient.getId())
+			.stream()
+			.filter(team -> isActiveTeam(team, today))
+			.map(TherapeuticTeam::getProfessional)
+			.map(ProfessionalProfile::getUser)
+			.toList();
+
+		recipients.addAll(teamUsers);
+
+		return recipients.stream()
+			.filter(user -> !user.getId().equals(dailyReport.getAuthor().getId()))
+			.map(User::getFcmToken)
+			.filter(token -> token != null && !token.isBlank())
+			.map(String::trim)
+			.distinct()
+			.collect(Collectors.toList());
+	}
+
+	private boolean isActiveTeam(TherapeuticTeam therapeuticTeam, LocalDate targetDate) {
+		boolean startsBeforeOrOnDate = !therapeuticTeam.getStartDate().isAfter(targetDate);
+		boolean endsAfterOrOnDate = therapeuticTeam.getEndDate() == null || !therapeuticTeam.getEndDate().isBefore(targetDate);
+		return startsBeforeOrOnDate && endsAfterOrOnDate;
+	}
+
+	private String buildPatientFullName(Patient patient) {
+		String firstName = patient.getFirstName() != null ? patient.getFirstName().trim() : "";
+		String lastName = patient.getLastName() != null ? patient.getLastName().trim() : "";
+		String fullName = (firstName + " " + lastName).trim();
+		return fullName.isBlank() ? "el paciente" : fullName;
+	}
+
+	private String translatePriority(DailyReportPriority priority) {
+		return switch (priority) {
+			case HIGH -> "ALTA";
+			case CRITICAL -> "CRITICA";
+			case MEDIUM -> "MEDIA";
+			case LOW -> "BAJA";
+		};
 	}
 
 	private DailyReportResponseDto mapToResponseDto(DailyReport dailyReport) {
