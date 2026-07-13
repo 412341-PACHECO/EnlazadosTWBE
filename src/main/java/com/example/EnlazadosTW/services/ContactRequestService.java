@@ -2,6 +2,8 @@ package com.example.EnlazadosTW.services;
 
 import com.example.EnlazadosTW.dtos.ContactRequestCreateDto;
 import com.example.EnlazadosTW.dtos.ContactRequestResponseDto;
+import com.example.EnlazadosTW.dtos.ParentContactRequestResponseDto;
+import com.example.EnlazadosTW.dtos.ProfessionalContactSummaryDto;
 import com.example.EnlazadosTW.entities.ContactRequest;
 import com.example.EnlazadosTW.entities.Patient;
 import com.example.EnlazadosTW.entities.ProfessionalProfile;
@@ -73,6 +75,54 @@ public class ContactRequestService {
 
 	@Transactional(readOnly = true)
 	public List<ContactRequestResponseDto> getContactRequestsByProfessional(UUID professionalId) {
+		ProfessionalProfile professionalProfile = getAuthenticatedProfessionalProfile(professionalId);
+
+		return contactRequestRepository.findByProfessionalProfileIdOrderByCreatedAtDesc(professionalProfile.getId())
+			.stream()
+			.map(this::mapToResponseDto)
+			.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public List<ParentContactRequestResponseDto> getContactRequestsByParent(UUID parentId) {
+		User currentUser = currentUserService.getCurrentAuthenticatedUser();
+		currentUserService.requireRole(currentUser, "PARENT");
+
+		if (!currentUser.getId().equals(parentId)) {
+			throw new IllegalArgumentException("El tutor autenticado no tiene permisos sobre estas solicitudes");
+		}
+
+		return contactRequestRepository.findByParentUserIdOrderByCreatedAtDesc(parentId)
+			.stream()
+			.map(this::mapToParentResponseDto)
+			.toList();
+	}
+
+	public ContactRequestResponseDto markContactRequestAsViewed(UUID requestId) {
+		ContactRequest contactRequest = getOwnedContactRequestForAuthenticatedProfessional(requestId);
+		contactRequest.setStatus(ContactRequestStatus.VIEWED);
+		return mapToResponseDto(contactRequestRepository.save(contactRequest));
+	}
+
+	public int markAllContactRequestsAsViewed(UUID professionalId) {
+		ProfessionalProfile professionalProfile = getAuthenticatedProfessionalProfile(professionalId);
+
+		List<ContactRequest> pendingRequests = contactRequestRepository.findByProfessionalProfileIdAndStatus(
+			professionalProfile.getId(),
+			ContactRequestStatus.PENDING
+		);
+
+		pendingRequests.forEach(request -> request.setStatus(ContactRequestStatus.VIEWED));
+		contactRequestRepository.saveAll(pendingRequests);
+		return pendingRequests.size();
+	}
+
+	private ProfessionalProfile getProfessionalProfileById(UUID professionalId) {
+		return professionalProfileRepository.findById(professionalId)
+			.orElseThrow(() -> new IllegalArgumentException("Perfil profesional no encontrado con ID: " + professionalId));
+	}
+
+	private ProfessionalProfile getAuthenticatedProfessionalProfile(UUID professionalId) {
 		User currentUser = currentUserService.getCurrentAuthenticatedUser();
 		currentUserService.requireRole(currentUser, "PROFESSIONAL");
 
@@ -83,15 +133,24 @@ public class ContactRequestService {
 			throw new IllegalArgumentException("El profesional autenticado no tiene permisos sobre estas solicitudes");
 		}
 
-		return contactRequestRepository.findByProfessionalProfileIdOrderByCreatedAtDesc(professionalId)
-			.stream()
-			.map(this::mapToResponseDto)
-			.toList();
+		return professionalProfile;
 	}
 
-	private ProfessionalProfile getProfessionalProfileById(UUID professionalId) {
-		return professionalProfileRepository.findById(professionalId)
-			.orElseThrow(() -> new IllegalArgumentException("Perfil profesional no encontrado con ID: " + professionalId));
+	private ContactRequest getOwnedContactRequestForAuthenticatedProfessional(UUID requestId) {
+		User currentUser = currentUserService.getCurrentAuthenticatedUser();
+		currentUserService.requireRole(currentUser, "PROFESSIONAL");
+
+		ContactRequest contactRequest = contactRequestRepository.findById(requestId)
+			.orElseThrow(() -> new IllegalArgumentException("Solicitud de contacto no encontrada con ID: " + requestId));
+
+		ProfessionalProfile professionalProfile = professionalProfileRepository.findByUserId(currentUser.getId())
+			.orElseThrow(() -> new IllegalArgumentException("El usuario autenticado no tiene perfil profesional"));
+
+		if (!contactRequest.getProfessionalProfile().getId().equals(professionalProfile.getId())) {
+			throw new IllegalArgumentException("El profesional autenticado no tiene permisos sobre esta solicitud");
+		}
+
+		return contactRequest;
 	}
 
 	private Patient getOwnedPatientIfPresent(UUID patientId, User currentUser) {
@@ -173,6 +232,45 @@ public class ContactRequestService {
 			patientFullName,
 			contactRequest.getMessage(),
 			contactRequest.getStatus(),
+			contactRequest.getCreatedAt(),
+			contactRequest.getUpdatedAt()
+		);
+	}
+
+	private ParentContactRequestResponseDto mapToParentResponseDto(ContactRequest contactRequest) {
+		String patientFullName = null;
+		UUID patientId = null;
+		if (contactRequest.getPatient() != null) {
+			patientId = contactRequest.getPatient().getId();
+			patientFullName = buildFullName(
+				contactRequest.getPatient().getFirstName(),
+				contactRequest.getPatient().getLastName()
+			);
+		}
+
+		ProfessionalProfile professionalProfile = contactRequest.getProfessionalProfile();
+		ProfessionalContactSummaryDto professionalDto = new ProfessionalContactSummaryDto(
+			professionalProfile.getId(),
+			professionalProfile.getUser().getId(),
+			professionalProfile.getUser().getFirstName(),
+			professionalProfile.getUser().getLastName(),
+			professionalProfile.getSpecialty(),
+			professionalProfile.getAcceptedHealthInsurances(),
+			professionalProfile.getSessionFee()
+		);
+
+		return new ParentContactRequestResponseDto(
+			contactRequest.getId(),
+			contactRequest.getParentUser().getId(),
+			professionalProfile.getId(),
+			patientId,
+			contactRequest.getParentFullName(),
+			contactRequest.getParentEmail(),
+			contactRequest.getParentPhone(),
+			patientFullName,
+			contactRequest.getMessage(),
+			contactRequest.getStatus(),
+			professionalDto,
 			contactRequest.getCreatedAt(),
 			contactRequest.getUpdatedAt()
 		);

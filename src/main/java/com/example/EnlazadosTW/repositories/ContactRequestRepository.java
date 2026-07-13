@@ -13,4 +13,8 @@ import org.springframework.stereotype.Repository;
 public interface ContactRequestRepository extends JpaRepository<ContactRequest, UUID> {
 
 	List<ContactRequest> findByProfessionalProfileIdOrderByCreatedAtDesc(UUID professionalProfileId);
+
+	List<ContactRequest> findByParentUserIdOrderByCreatedAtDesc(UUID parentUserId);
+
+	List<ContactRequest> findByProfessionalProfileIdAndStatus(UUID professionalProfileId, com.example.EnlazadosTW.enums.ContactRequestStatus status);
 }
