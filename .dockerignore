@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.vscode
+.agents
+.codex
+target
+*.iml
+HELP.md
+PROJECT_TECHNICAL_GUIDE.md
+EXCEPTIONS_GUIDE.md
